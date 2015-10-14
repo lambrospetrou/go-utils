@@ -1,7 +1,6 @@
 package io
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -9,66 +8,82 @@ import (
 	"strings"
 )
 
-func compileSinglePost(src_post_dir string, info os.FileInfo, dst_posts_dir string, viewBuilder *view.Builder) error {
-	postName := info.Name()[11 : len(info.Name())-3]
-	postDir := filepath.Join(dst_posts_dir, postName)
-	// create the directory of the post
-	if err := os.MkdirAll(postDir, SITE_DST_PERM); err != nil {
-		return err
-	}
-
-	// get the markdown filename
-	postMarkdownPath := filepath.Join(src_post_dir, info.Name())
-
-	// create the actual HTML file for the post
-	bundle := &view.TemplateBundle{
-		Footer: &view.FooterStruct{Year: time.Now().Year()},
-		Header: &view.HeaderStruct{Title: "Single Post"},
-		Post:   post.FromFile(postMarkdownPath),
-	}
-	f, err := os.Create(filepath.Join(postDir, postName+".html"))
+func Copy(src string, dst string, mode os.FileMode) error {
+	fmt.Println(src, dst)
+	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	err = viewBuilder.Render(w, view.LAYOUT_POST, bundle)
-	w.Flush()
+	if !srcInfo.IsDir() {
+		return CopyFile(src, dst, mode)
+	} else {
+		return CopyDir(src, dst, mode)
+	}
+}
 
-	// copy the markdown file to the directory
-	markdown, err := ioutil.ReadFile(postMarkdownPath)
+func CopyFile(src string, dst string, mode os.FileMode) error {
+	b, err := ioutil.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(filepath.Join(postDir, info.Name()), markdown, SITE_DST_PERM)
-	return err
+	return ioutil.WriteFile(dst, b, mode)
+}
+
+func CopyDir(src string, dst string, mode os.FileMode) error {
+	return filepath.Walk(src, createCopyWalkFn(src, dst, mode))
+}
+
+func createCopyWalkFn(src_dir string, dst_dir string, mode os.FileMode) filepath.WalkFunc {
+	counter := 0
+	return func(path string, info os.FileInfo, err error) error {
+		counter++
+		if counter == 1 {
+			// this is the root of the directory being copied
+			return os.MkdirAll(dst_dir, mode)
+		}
+
+		fmt.Println("===", path)
+		dstFullPath := filepath.Join(dst_dir, path[len(src_dir):])
+		fmt.Println("src", path, "dst", dstFullPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstFullPath, mode)
+		} else {
+			return CopyFile(path, dstFullPath, mode)
+		}
+		return nil
+	}
 }
 
 // CopyDir copies the directory 'src' into the folder 'dst_parent' such that 'dst_parent/basename(src)'
 // contains the same contents as 'src'.
-func CopyDir(src string, dst_parent string, mode os.FileMode) error {
-	return filepath.Walk(src, createCopyWalkFn(filepath.Dir(src), dst_parent, mode))
+func CopyDirAuto(src string, dst_parent string, mode os.FileMode) error {
+	return filepath.Walk(src, createCopyWalkFnAuto(src, dst_parent, mode))
 }
 
-func createCopyWalkFn(src_parent string, dst_parent string, mode os.FileMode) {
+func createCopyWalkFnAuto(src_dir string, dst_parent_dir string, mode os.FileMode) filepath.WalkFunc {
+	counter := 0
+	src_dir_parent := filepath.Dir(src_dir)
 	return func(path string, info os.FileInfo, err error) error {
-		srcBasePath := strings.Replace(path, src_parent, "", 1) + info.Name()
-		dstFullPath := filepath.Join(dst_parent, srcBasePath)
+		counter++
+		if counter == 1 {
+			// this is the root of the directory being copied
+			return os.MkdirAll(filepath.Join(dst_parent_dir, info.Name()), mode)
+		}
 
+		dstFullPath := filepath.Join(dst_parent_dir, strings.Replace(path, src_dir_parent, "", 1))
 		fmt.Println("src", path, "dst", dstFullPath)
 
 		if info.IsDir() {
-			if err := os.MkdirAll(dstFullPath, mode); err != nil {
-				return nil
-			}
+			return os.MkdirAll(dstFullPath, mode)
 		} else {
-			// copy the markdown file to the directory
+			// copy the file to the directory
 			b, err := ioutil.ReadFile(path)
 			if err != nil {
 				return err
 			}
-			err = ioutil.WriteFile(dstFullPath, b, mode)
-			return err
+			return ioutil.WriteFile(dstFullPath, b, mode)
 		}
+		return nil
 	}
 }
