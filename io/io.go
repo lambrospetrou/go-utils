@@ -8,7 +8,7 @@ import (
 )
 
 func Copy(src string, dst string, mode os.FileMode) error {
-	fmt.Println(src, dst)
+	fmt.Println("src", src, "dst", dst)
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
@@ -41,9 +41,7 @@ func createCopyWalkFn(src_dir string, dst_dir string, mode os.FileMode) filepath
 			return os.MkdirAll(dst_dir, mode)
 		}
 
-		fmt.Println("===", path)
 		dstFullPath := filepath.Join(dst_dir, path[len(src_dir):])
-		fmt.Println("src", path, "dst", dstFullPath)
 
 		if info.IsDir() {
 			return os.MkdirAll(dstFullPath, mode)
