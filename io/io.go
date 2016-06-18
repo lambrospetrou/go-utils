@@ -1,7 +1,6 @@
 package io
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
