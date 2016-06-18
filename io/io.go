@@ -8,7 +8,7 @@ import (
 )
 
 func Copy(src string, dst string, mode os.FileMode) error {
-	fmt.Println("src", src, "dst", dst)
+	//fmt.Println("src", src, "dst", dst)
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return err
